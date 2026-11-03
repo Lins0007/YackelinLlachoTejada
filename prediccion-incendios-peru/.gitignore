@@ -1,0 +1,7 @@
+data/
+modelos/
+salidas/
+__pycache__/
+.pytest_cache/
+*.pyc
+.env
