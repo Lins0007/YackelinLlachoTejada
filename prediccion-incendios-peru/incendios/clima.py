@@ -17,16 +17,39 @@ URL_PRONOSTICO = "https://api.open-meteo.com/v1/forecast"
 LOTE = 10  # ubicaciones por petición (menos ubicaciones = menos errores 429)
 
 
-def _pedir(url: str, params: dict, intentos: int = 6) -> list[dict]:
+def _espera_por_limite(texto: str) -> int:
+    """Segundos a esperar según el límite que Open-Meteo dice haber superado."""
+    t = texto.lower()
+    if "daily" in t:
+        return 3600
+    if "hourly" in t:
+        return 600
+    return 65  # límite por minuto u otro
+
+
+def _pedir(url: str, params: dict, intentos: int = 60) -> list[dict]:
     for i in range(intentos):
-        r = requests.get(url, params=params, timeout=300)
+        try:
+            r = requests.get(url, params=params, timeout=300)
+        except requests.RequestException as e:  # cortes de red: reintentar
+            print(f"    error de red ({e.__class__.__name__}); reintento en 30s")
+            time.sleep(30)
+            continue
         if r.status_code == 200:
-            js = r.json()
+            try:
+                js = r.json()
+            except ValueError:  # respuesta cortada a mitad de camino
+                print("    respuesta incompleta; reintento en 30s", flush=True)
+                time.sleep(30)
+                continue
             return js if isinstance(js, list) else [js]
-        if r.status_code == 429 or r.status_code >= 500:  # límite de uso: esperar
-            espera = 60 * (i + 1)
-            print(f"    Open-Meteo {r.status_code}; esperando {espera}s")
+        if r.status_code == 429:
+            espera = _espera_por_limite(r.text)
+            print(f"    Open-Meteo 429 ({r.text[:120].strip()}); esperando {espera}s", flush=True)
             time.sleep(espera)
+            continue
+        if r.status_code >= 500:
+            time.sleep(60)
             continue
         raise RuntimeError(f"Open-Meteo {r.status_code}: {r.text[:300]}")
     raise RuntimeError("Open-Meteo: demasiados reintentos")
@@ -53,7 +76,7 @@ def descargar_historico(celdas: pd.DataFrame, inicio: str, fin: str) -> pd.DataF
         if destino.exists():
             partes.append(pd.read_parquet(destino))
             continue
-        print(f"  clima lote {k // LOTE + 1}/{-(-len(celdas) // LOTE)}")
+        print(f"  clima lote {k // LOTE + 1}/{-(-len(celdas) // LOTE)}", flush=True)
         params = {
             "latitude": ",".join(f"{v:.3f}" for v in lote.lat),
             "longitude": ",".join(f"{v:.3f}" for v in lote.lon),
