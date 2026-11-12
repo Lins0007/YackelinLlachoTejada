@@ -34,6 +34,29 @@ El fuego es un evento raro y desbalanceado, así que la exactitud (accuracy) no 
 
 El modelo solo vale la pena si supera claramente a las dos líneas base.
 
+## Resultados (datos reales 2014–2025)
+
+Entrenamiento con 473 celdas de 0.5° con fuego recurrente: 1.34 M celda-días para entrenar
+(2014–2021), 169 mil para validar (2022) y 515 mil para probar (2023–2025).
+En el 29% de los celda-días del test hubo fuego en los 7 días siguientes.
+
+**Test (2023–2025):**
+
+| Método | ROC-AUC | PR-AUC | Recall top 10% | Recall top 20% |
+|---|---|---|---|---|
+| **Modelo (LightGBM)** | **0.904** | **0.815** | **0.279** | **0.482** |
+| Persistencia (fuego últimos 7 días) | 0.835 | 0.715 | 0.252 | 0.435 |
+| Climatología (tasa histórica del mes) | 0.893 | 0.791 | 0.274 | 0.475 |
+
+- **Cómo leer el recall top 10%:** como hay fuego en el 29% de los casos, el 10% de celdas de mayor riesgo puede contener como máximo el 35% de los incendios. El modelo captura el 27.9%, cerca de ese techo.
+- **Anticipación real:** en las celdas sin fuego en los últimos 30 días (la mitad del test), donde aparece fuego nuevo el 6.8% de las veces, el modelo obtiene un PR-AUC de 0.302, frente a 0.266 de la climatología. Ese es el caso de mayor valor operativo y donde más hay que mejorar.
+- **Calibración:** las probabilidades son confiables. Cuando el modelo dice ~93%, ocurrió fuego en el 93.6% de los casos; cuando dice ~1%, en el 0.6%.
+- **Variables más importantes:** días con fuego en los últimos 30 días (42%), tasa histórica del mes (37%) y días desde el último fuego (6%). El clima aporta poco por ahora, porque a 55 km y con zonas de quema recurrente domina el patrón estacional, sobre todo de quemas agrícolas.
+
+**Conclusión:** el modelo supera claramente a la persistencia y algo a la climatología. Lo que más
+puede mejorarlo es una resolución más fina (0.25°) y variables de vegetación y de actividad humana
+(ver "Mejoras siguientes").
+
 ## Uso
 
 ```bash
